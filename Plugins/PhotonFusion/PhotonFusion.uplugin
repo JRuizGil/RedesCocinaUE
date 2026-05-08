@@ -1,0 +1,42 @@
+{
+	"FileVersion": 3,
+	"Version": 1214,
+	"VersionName": "3.0.0-Preview-1214",
+	"FriendlyName": "Photon Fusion",
+	"Description": "Client plugin for Photon Fusion",
+	"Category": "Photon",
+	"CreatedBy": "Exit Games GmbH",
+	"CreatedByURL": "https://www.photonengine.com/",
+	"DocsURL": "https://doc.photonengine.com/fusion-unreal/current/fusion-3-intro",
+	"MarketplaceURL": "",
+	"SupportURL": "https://www.photonengine.com/",
+	"EngineVersion": "5.6.0",
+	"CanContainContent": true,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": true,
+	"Installed": true,
+	"Modules": [
+		{
+			"Name": "PhotonFusion",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64",
+				"Android",
+				"Mac",
+				"IOS",
+				"Linux"
+			]
+		},
+		{
+			"Name": "PhotonFusionEditor",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac",
+				"Linux"
+			]
+		}
+	]
+}
