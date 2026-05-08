@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:meadow-reaper-dd6.notion.site)",
+      "mcp__claude_ai_Notion__notion-fetch"
+    ]
+  }
+}
