@@ -16,7 +16,7 @@
 *.dylib
 *.dll
 
-# Fortran module files
+# Fortran module files.gitignore
 *.mod
 
 # Compiled Static libraries
