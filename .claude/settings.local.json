@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:meadow-reaper-dd6.notion.site)",
-      "mcp__claude_ai_Notion__notion-fetch"
+      "mcp__claude_ai_Notion__notion-fetch",
+      "Bash(rm \"Source/RedesCocinaUE/RedesCocinaUEGameMode.h\" \"Source/RedesCocinaUE/RedesCocinaUEGameMode.cpp\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\JoseRamonRuizGil\\Documents\\Unreal Projects\\RedesCocinaUE\\Source\\RedesCocinaUE"
     ]
   }
 }
