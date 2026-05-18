@@ -182,6 +182,45 @@ OnPlayerNameUpdated(PlayerName);
 
 Vuelve a `ACocinaGameMode` y, en lugar de fijar `DefaultPawnClass = APlayerCocina::StaticClass()`, deja que el `BP_CocinaGameMode` apunte a `BP_PlayerCocina`. Más flexible y los settings de mesh/animation se editan visualmente.
 
+Paso 4 — Implementar el evento OnPlayerNameUpdated en BP
+Aún en BP_PlayerCocina, pestaña Event Graph.
+En el panel My Blueprint → Functions / Events → Override, busca On Player Name Updated (aparece porque lo expusiste en C++ en el Paso 1) → clic para añadir el nodo evento.
+Construye este grafo a partir del nodo Event On Player Name Updated (que trae el pin New Name : String):
+
+Event On Player Name Updated (New Name) 
+        │
+        ▼
+   [Nameplate] (drag desde Components al graph → "Get")
+        │
+        ▼
+   Get User Widget Object   ← (método del WidgetComponent)
+        │
+        ▼
+   Cast To WBP_Nameplate
+        │ (As WBP_Nameplate)
+        ▼
+   Set DisplayedName  ←── conecta `New Name` al pin Value
+Pasos concretos en el editor:
+
+Arrastra Nameplate del panel Components al grafo → Get Nameplate.
+Arrastra desde su pin azul → escribe "Get User Widget Object" → pon ese nodo.
+Arrastra desde el Return Value → "Cast to WBP_Nameplate".
+Desde el pin As WBP Nameplate → arrastra y escribe "Set Displayed Name".
+Conecta el pin New Name del evento al Value del Set.
+Conecta los pines blancos de ejecución (Event → Cast → Set).
+Paso 5 — (Opcional) ocultar el nameplate propio
+Al lado del mismo nodo, antes del Set, añade un Branch con Is Locally Controlled:
+
+True → Nameplate → Set Visibility (false) y return.
+False → continúa al Set Displayed Name.
+Así no ves tu propio cartel encima de tu cabeza.
+
+Paso 6 — Probar
+Compile + Save en BP_PlayerCocina y WBP_Nameplate.
+Play con Number of Players = 2, Net Mode = Play As Listen Server.
+Verifica que el nombre que cada cliente metió en el menú aparece sobre la cabeza del otro Pawn.
+Si ves "Jugador" estático en los remotos, revisa el checklist 5.7 y la tabla de errores 5.8 — el caso típico es olvidar el DOREPLIFETIME (ya lo tienes en PlayerCocina.cpp:25) o que OnRep_PlayerName no estaba disparando el evento BP (Paso 1).
+
 ---
 
 ## 5.5 Smoke test
