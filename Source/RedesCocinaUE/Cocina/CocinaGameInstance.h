@@ -10,11 +10,11 @@ class REDESCOCINAUE_API UCocinaGameInstance : public UGameInstance
     GENERATED_BODY()
 
 public:
-    /** Nombre que introduce el jugador en el menú. Persiste toda la sesión. */
+    /** Nombre que introduce el jugador en el menï¿½. Persiste toda la sesiï¿½n. */
     UPROPERTY(BlueprintReadWrite, Category = "Cocina")
     FString PlayerDisplayName = TEXT("Jugador");
 
-    /** Validación simple: 1..16 caracteres, sin espacios al borde. */
+    /** Validaciï¿½n simple: 1..16 caracteres, sin espacios al borde. */
     UFUNCTION(BlueprintCallable, Category = "Cocina")
     bool SetPlayerName(const FString& Raw);
 };

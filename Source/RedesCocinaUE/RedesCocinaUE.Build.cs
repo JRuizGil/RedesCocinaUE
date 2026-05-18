@@ -18,8 +18,8 @@ public class RedesCocinaUE : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
-    		"PhotonFusion"  
+			"Slate",
+			"PhotonFusion"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
