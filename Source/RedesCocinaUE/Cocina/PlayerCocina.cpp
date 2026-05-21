@@ -3,6 +3,10 @@
 #include "FusionActorComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
+#include "GameFramework/PlayerController.h"
+#include "Engine/LocalPlayer.h"
 
 APlayerCocina::APlayerCocina()
 {
@@ -28,6 +32,37 @@ void APlayerCocina::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 void APlayerCocina::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (IsLocallyControlled())
+    {
+        if (APlayerController* PC = Cast<APlayerController>(GetController()))
+        {
+            if (ULocalPlayer* LP = PC->GetLocalPlayer())
+            {
+                if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+                        ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LP))
+                {
+                    if (MappingContexts.Num() == 0)
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("[PlayerCocina] MappingContexts vacio en BP. Asignar al menos IMC_Default e IMC_MouseLook."));
+                    }
+                    for (UInputMappingContext* IMC : MappingContexts)
+                    {
+                        if (IMC)
+                        {
+                            Subsystem->AddMappingContext(IMC, MappingPriority);
+                        }
+                    }
+                }
+            }
+
+            // Asegura modo Game para que el input llegue al pawn (el menu lo dejaba en UI Only).
+            FInputModeGameOnly GameOnly;
+            PC->SetInputMode(GameOnly);
+            PC->bShowMouseCursor = false;
+        }
+    }
+
     RefreshNameplate();
 }
 
