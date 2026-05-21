@@ -159,11 +159,14 @@ void AIngrediente::AttachToHolder()
         UE_LOG(LogTemp, Log, TEXT("[Ingrediente] Attach a %s socket '%s' existe=%d"),
                *GetNameSafe(HolderMesh), *HandSocketName.ToString(), bSocketExists ? 1 : 0);
 
-        // KeepRelativeTransform + reset manual => evita problemas de escala del bone.
-        AttachToComponent(HolderMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocketName);
-        SetActorRelativeLocation(FVector::ZeroVector);
-        SetActorRelativeRotation(FRotator::ZeroRotator);
-        SetActorRelativeScale3D(FVector(1.f));
+        // Snap a la posicion/rotacion del socket, pero conserva la escala mundial previa
+        // (asi el ingrediente no se deforma por la escala del bone de la mano).
+        const FAttachmentTransformRules AttachRules(
+            EAttachmentRule::SnapToTarget,  // Location
+            EAttachmentRule::SnapToTarget,  // Rotation
+            EAttachmentRule::KeepWorld,     // Scale
+            false /* WeldSimulatedBodies */);
+        AttachToComponent(HolderMesh, AttachRules, HandSocketName);
 
         UE_LOG(LogTemp, Log, TEXT("[Ingrediente] Tras attach, mundo=%s"),
                *GetActorLocation().ToString());

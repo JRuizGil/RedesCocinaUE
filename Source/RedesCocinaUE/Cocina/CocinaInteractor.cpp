@@ -1,6 +1,7 @@
 #include "Cocina/CocinaInteractor.h"
 #include "Cocina/Ingrediente.h"
 #include "Cocina/PlayerCocina.h"
+#include "Cocina/Estacion.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "DrawDebugHelpers.h"
@@ -65,18 +66,41 @@ void UCocinaInteractor::OnInteractPressed()
     if (!OwnerPawn || !OwnerPawn->IsLocallyControlled()) return;
 
     AActor* Focused = ActorEnfocado.Get();
-    UE_LOG(LogTemp, Log, TEXT("[Interactor] E pulsada. Enfocado=%s, Held=%s"),
-           *GetNameSafe(Focused), *GetNameSafe(GetHeldIngrediente()));
+    AIngrediente* Held = GetHeldIngrediente();
 
-    // Si llevo algo en mano -> soltar.
-    if (AIngrediente* Held = GetHeldIngrediente())
+    UE_LOG(LogTemp, Log, TEXT("[Interactor] E pulsada. Enfocado=%s, Held=%s"),
+           *GetNameSafe(Focused), *GetNameSafe(Held));
+
+    // 1) Mirando una estacion -> depositar (si llevo algo) o recoger (si esta Listo).
+    if (AEstacion* Est = Cast<AEstacion>(Focused))
+    {
+        if (Held)
+        {
+            Est->RequestDepositar(OwnerPawn, Held);
+            UE_LOG(LogTemp, Log, TEXT("[Interactor] Depositar en %s"), *GetNameSafe(Est));
+        }
+        else if (Est->Estado == EEstadoEstacion::Listo)
+        {
+            Est->RequestRecoger(OwnerPawn);
+            UE_LOG(LogTemp, Log, TEXT("[Interactor] Recoger de %s"), *GetNameSafe(Est));
+        }
+        else
+        {
+            UE_LOG(LogTemp, Log, TEXT("[Interactor] Estacion %s no aceptable (estado=%d, manos vacias)"),
+                   *GetNameSafe(Est), (int32)Est->Estado);
+        }
+        return;
+    }
+
+    // 2) Llevo algo en mano y no miro estacion -> soltar.
+    if (Held)
     {
         const bool bOk = Held->RequestDrop(OwnerPawn);
         UE_LOG(LogTemp, Log, TEXT("[Interactor] RequestDrop -> %s"), bOk ? TEXT("OK") : TEXT("rechazado"));
         return;
     }
 
-    // Si miro a un ingrediente suelto -> coger.
+    // 3) Miro un ingrediente suelto -> coger.
     if (AIngrediente* Ing = Cast<AIngrediente>(Focused))
     {
         const bool bOk = Ing->RequestPickup(OwnerPawn);
@@ -86,7 +110,6 @@ void UCocinaInteractor::OnInteractPressed()
     }
 
     UE_LOG(LogTemp, Log, TEXT("[Interactor] Nada que hacer (no enfocado, no held)."));
-    // Estaciones y zona de emplatado se anyaden en fases 07/08.
 }
 
 AIngrediente* UCocinaInteractor::GetHeldIngrediente() const
