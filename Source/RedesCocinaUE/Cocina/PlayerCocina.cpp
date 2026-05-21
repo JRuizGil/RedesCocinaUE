@@ -1,9 +1,12 @@
 #include "Cocina/PlayerCocina.h"
 #include "Cocina/CocinaGameInstance.h"
+#include "Cocina/CocinaInteractor.h"
 #include "FusionActorComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "InputAction.h"
 #include "InputMappingContext.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/LocalPlayer.h"
@@ -20,7 +23,36 @@ APlayerCocina::APlayerCocina()
     NameplateComp->SetWidgetSpace(EWidgetSpace::Screen);
     NameplateComp->SetDrawSize(FVector2D(180, 36));
 
+    Interactor = CreateDefaultSubobject<UCocinaInteractor>(TEXT("Interactor"));
+
     bReplicates = true;
+}
+
+void APlayerCocina::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+    if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    {
+        if (InteractAction)
+        {
+            EIC->BindAction(InteractAction, ETriggerEvent::Started, this, &APlayerCocina::OnInteractTriggered);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[PlayerCocina] InteractAction no asignado en BP. La tecla E no funcionara."));
+        }
+    }
+}
+
+void APlayerCocina::OnInteractTriggered()
+{
+    UE_LOG(LogTemp, Log, TEXT("[PlayerCocina] IA_Interact disparado en %s (local=%d)"),
+           *GetNameSafe(this), IsLocallyControlled() ? 1 : 0);
+    if (Interactor)
+    {
+        Interactor->OnInteractPressed();
+    }
 }
 
 void APlayerCocina::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

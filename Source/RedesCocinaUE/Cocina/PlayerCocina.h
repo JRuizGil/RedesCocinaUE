@@ -7,7 +7,8 @@
 class UFusionActorComponent;
 class UWidgetComponent;
 class UInputMappingContext;
-// class UCocinaInteractor;  // se a�adir� en fase 06
+class UInputAction;
+class UCocinaInteractor;
 
 UCLASS()
 class REDESCOCINAUE_API APlayerCocina : public ARedesCocinaUECharacter
@@ -30,6 +31,7 @@ protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void PossessedBy(AController* NewController) override;
     virtual void OnRep_PlayerState() override;
+    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
     UFUNCTION()
     void OnRep_PlayerName();
@@ -54,7 +56,16 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cocina|Input")
     int32 MappingPriority = 0;
 
-    // Interactor (fase 06) se a�adir� cuando exista UCocinaInteractor
+    /** Accion de interaccion (tecla E). Asignar IA_Interact en Class Defaults. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cocina|Input")
+    TObjectPtr<UInputAction> InteractAction;
+
+    /** Componente que arbitra pickup/drop/uso de estaciones. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cocina")
+    TObjectPtr<UCocinaInteractor> Interactor;
+
+    /** Handler bindeado a IA_Interact. */
+    void OnInteractTriggered();
 
     void RefreshNameplate();
 };
