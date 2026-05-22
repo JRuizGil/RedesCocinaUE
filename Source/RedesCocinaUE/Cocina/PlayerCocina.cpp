@@ -1,7 +1,11 @@
 #include "Cocina/PlayerCocina.h"
 #include "Cocina/CocinaGameInstance.h"
 #include "Cocina/CocinaInteractor.h"
+#include "Cocina/Estacion.h"
+#include "Cocina/ZonaEmplatado.h"
+#include "Cocina/Ingrediente.h"
 #include "FusionActorComponent.h"
+#include "FusionOnlineSubsystem.h"
 #include "Components/WidgetComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "EnhancedInputComponent.h"
@@ -59,6 +63,68 @@ void APlayerCocina::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(APlayerCocina, PlayerName);
+    DOREPLIFETIME(APlayerCocina, ReqTarget);
+    DOREPLIFETIME(APlayerCocina, ReqIngrediente);
+    DOREPLIFETIME(APlayerCocina, ReqAccion);
+    DOREPLIFETIME(APlayerCocina, ReqNonce);
+}
+
+void APlayerCocina::SubmitDepositarEstacion(AEstacion* Estacion, AIngrediente* Ing)
+{
+    SubmitCocinaRequest(Cast<AActor>(Estacion), Ing, ECocinaAccion::DepositarEstacion);
+}
+
+void APlayerCocina::SubmitRecogerEstacion(AEstacion* Estacion)
+{
+    SubmitCocinaRequest(Cast<AActor>(Estacion), nullptr, ECocinaAccion::RecogerEstacion);
+}
+
+void APlayerCocina::SubmitDepositarPlato(AZonaEmplatado* Zona, AIngrediente* Ing)
+{
+    SubmitCocinaRequest(Cast<AActor>(Zona), Ing, ECocinaAccion::DepositarPlato);
+}
+
+void APlayerCocina::SubmitCocinaRequest(AActor* Target, AIngrediente* Ing, ECocinaAccion Accion)
+{
+    if (!Target) return;
+
+    ReqTarget = Target;
+    ReqIngrediente = Ing;
+    ReqAccion = Accion;
+    ++ReqNonce; // fuerza OnRep_Request en el resto de clientes (incluido el MC)
+
+    // OnRep no dispara en el autor del cambio. Si YO soy el MC, ejecuto la logica ya.
+    UFusionOnlineSubsystem* Fusion = GetGameInstance() ? GetGameInstance()->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
+    if (Fusion && Fusion->IsMasterClient())
+    {
+        DispatchCocinaRequest();
+    }
+}
+
+void APlayerCocina::OnRep_Request()
+{
+    // Solo el MC es autoritativo sobre el estado de estaciones/zona.
+    UFusionOnlineSubsystem* Fusion = GetGameInstance() ? GetGameInstance()->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
+    if (!Fusion || !Fusion->IsMasterClient()) return;
+    DispatchCocinaRequest();
+}
+
+void APlayerCocina::DispatchCocinaRequest()
+{
+    switch (ReqAccion)
+    {
+        case ECocinaAccion::DepositarEstacion:
+            if (AEstacion* Est = Cast<AEstacion>(ReqTarget)) Est->MC_HandleDepositar(ReqIngrediente);
+            break;
+        case ECocinaAccion::RecogerEstacion:
+            if (AEstacion* Est = Cast<AEstacion>(ReqTarget)) Est->MC_HandleRecoger(this);
+            break;
+        case ECocinaAccion::DepositarPlato:
+            if (AZonaEmplatado* Zona = Cast<AZonaEmplatado>(ReqTarget)) Zona->MC_HandleAgregar(ReqIngrediente);
+            break;
+        default:
+            break;
+    }
 }
 
 void APlayerCocina::BeginPlay()

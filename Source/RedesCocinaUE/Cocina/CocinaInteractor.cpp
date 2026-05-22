@@ -2,6 +2,7 @@
 #include "Cocina/Ingrediente.h"
 #include "Cocina/PlayerCocina.h"
 #include "Cocina/Estacion.h"
+#include "Cocina/ZonaEmplatado.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "DrawDebugHelpers.h"
@@ -92,7 +93,22 @@ void UCocinaInteractor::OnInteractPressed()
         return;
     }
 
-    // 2) Llevo algo en mano y no miro estacion -> soltar.
+    // 2) Mirando la zona de emplatado con un ingrediente procesado -> emplatar.
+    if (AZonaEmplatado* Zona = Cast<AZonaEmplatado>(Focused))
+    {
+        if (Held)
+        {
+            Zona->RequestDepositarPlato(OwnerPawn, Held);
+            UE_LOG(LogTemp, Log, TEXT("[Interactor] Emplatar en %s"), *GetNameSafe(Zona));
+        }
+        else
+        {
+            UE_LOG(LogTemp, Log, TEXT("[Interactor] Zona de emplatado pero manos vacias"));
+        }
+        return;
+    }
+
+    // 3) Llevo algo en mano y no miro estacion/zona -> soltar.
     if (Held)
     {
         const bool bOk = Held->RequestDrop(OwnerPawn);
@@ -100,7 +116,7 @@ void UCocinaInteractor::OnInteractPressed()
         return;
     }
 
-    // 3) Miro un ingrediente suelto -> coger.
+    // 4) Miro un ingrediente suelto -> coger.
     if (AIngrediente* Ing = Cast<AIngrediente>(Focused))
     {
         const bool bOk = Ing->RequestPickup(OwnerPawn);

@@ -4,6 +4,8 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameStateCocina.generated.h"
 
+class URecetaAsset;
+
 UENUM(BlueprintType)
 enum class EEstadoPartida : uint8
 {
@@ -34,6 +36,14 @@ public:
 
     UPROPERTY(ReplicatedUsing=OnRep_RecetaActiva, BlueprintReadOnly, Category="Cocina")
     int32 RecetaActivaIndex = -1;
+
+    /** Catalogo de recetas disponibles. Poblar en el BP derivado del GameState. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cocina")
+    TArray<TObjectPtr<URecetaAsset>> Recetas;
+
+    /** Receta apuntada por RecetaActivaIndex (nullptr si el indice no es valido). */
+    UFUNCTION(BlueprintPure, Category="Cocina")
+    URecetaAsset* GetRecetaActiva() const;
 
     UFUNCTION(BlueprintCallable, Category="Cocina|MC")
     void IniciarPartidaMC();

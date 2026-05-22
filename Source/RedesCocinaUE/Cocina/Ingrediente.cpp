@@ -29,21 +29,17 @@ void AIngrediente::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AIngrediente, Estado);
     DOREPLIFETIME(AIngrediente, Holder);
+    DOREPLIFETIME(AIngrediente, bEnPlato);
 }
 
 void AIngrediente::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (FusionComp)
-    {
-        FusionComp->OnOwnerWasGiven.AddDynamic(this, &AIngrediente::HandleOwnerGiven);
-        UE_LOG(LogTemp, Log, TEXT("[Ingrediente] %s: delegate OnOwnerWasGiven enganchado"), *GetNameSafe(this));
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[Ingrediente] %s: FusionComp null en BeginPlay"), *GetNameSafe(this));
-    }
+    // NOTA: no enganchamos OnOwnerWasGiven. Ese delegate disparaba en CUALQUIER
+    // cliente que ganara ownership (incluido el MC al tomar el ingrediente para
+    // procesarlo), agarrandolo a la mano del pawn local. El attach de pickup ya se
+    // hace de forma explicita en RequestPickup.
     UpdateVisualByEstado();
 }
 
@@ -58,6 +54,11 @@ bool AIngrediente::RequestPickup(APlayerCocina* Requester)
     {
         UE_LOG(LogTemp, Warning, TEXT("[Ingrediente] RequestPickup rechazado: ya tiene Holder=%s"),
                *GetNameSafe(Holder));
+        return false;
+    }
+    if (bEnPlato)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Ingrediente] RequestPickup rechazado: ya esta en el plato"));
         return false;
     }
 
@@ -91,26 +92,6 @@ bool AIngrediente::RequestDrop(APlayerCocina* Requester)
     return true;
 }
 
-void AIngrediente::HandleOwnerGiven()
-{
-    UE_LOG(LogTemp, Log, TEXT("[Ingrediente] HandleOwnerGiven en %s"), *GetNameSafe(this));
-
-    if (UWorld* World = GetWorld())
-    {
-        if (APlayerController* PC = World->GetFirstPlayerController())
-        {
-            if (APlayerCocina* MyPawn = Cast<APlayerCocina>(PC->GetPawn()))
-            {
-                UE_LOG(LogTemp, Log, TEXT("[Ingrediente] Asignando Holder=%s"), *GetNameSafe(MyPawn));
-                Holder = MyPawn;
-                OnRep_Holder();
-                return;
-            }
-            UE_LOG(LogTemp, Warning, TEXT("[Ingrediente] PC sin Pawn o no es APlayerCocina"));
-        }
-    }
-}
-
 void AIngrediente::SetProcesadoMC()
 {
     UGameInstance* GI = GetGameInstance();
@@ -120,6 +101,29 @@ void AIngrediente::SetProcesadoMC()
 
     Estado = EEstadoIngrediente::Procesado;
     OnRep_Estado();
+}
+
+void AIngrediente::SetEnPlatoMC()
+{
+    UGameInstance* GI = GetGameInstance();
+    UFusionOnlineSubsystem* Fusion = GI ? GI->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
+    if (!Fusion || !Fusion->IsMasterClient()) return;
+    if (bEnPlato) return;
+
+    bEnPlato = true;
+    OnRep_EnPlato();
+}
+
+void AIngrediente::OnRep_EnPlato()
+{
+    if (!bEnPlato) return;
+    // Representacion final en el plato: reduce escala y desactiva colision para que
+    // no se pueda volver a coger ni interfiera con el trace del interactor.
+    SetActorScale3D(FVector(0.5f));
+    if (Mesh)
+    {
+        Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
 }
 
 void AIngrediente::OnRep_Estado()

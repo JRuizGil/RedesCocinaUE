@@ -9,6 +9,19 @@ class UWidgetComponent;
 class UInputMappingContext;
 class UInputAction;
 class UCocinaInteractor;
+class AEstacion;
+class AZonaEmplatado;
+class AIngrediente;
+
+/** Accion autoritativa que un cliente solicita al Master Client. */
+UENUM()
+enum class ECocinaAccion : uint8
+{
+    Ninguna,
+    DepositarEstacion,
+    RecogerEstacion,
+    DepositarPlato,
+};
 
 UCLASS()
 class REDESCOCINAUE_API APlayerCocina : public ARedesCocinaUECharacter
@@ -26,6 +39,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Cocina")
     void SetMyNameFromGameInstance();
 
+    /** Canal de peticion al MC. El cliente local escribe estas props (que SI posee en
+     *  su pawn); el MC las recibe por replicacion y ejecuta la logica autoritativa.
+     *  Sustituye a los Server RPC, que no cruzan la red en Fusion shared mode. */
+    void SubmitDepositarEstacion(AEstacion* Estacion, AIngrediente* Ing);
+    void SubmitRecogerEstacion(AEstacion* Estacion);
+    void SubmitDepositarPlato(AZonaEmplatado* Zona, AIngrediente* Ing);
+
 protected:
     virtual void BeginPlay() override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -35,6 +55,33 @@ protected:
 
     UFUNCTION()
     void OnRep_PlayerName();
+
+    // --- Canal de peticion replicado (cliente -> MC) ---
+    /** Actor objetivo (AEstacion o AZonaEmplatado). */
+    UPROPERTY(Replicated)
+    TObjectPtr<AActor> ReqTarget = nullptr;
+
+    /** Ingrediente implicado (solo en peticiones de deposito). */
+    UPROPERTY(Replicated)
+    TObjectPtr<AIngrediente> ReqIngrediente = nullptr;
+
+    /** Accion solicitada. */
+    UPROPERTY(Replicated)
+    ECocinaAccion ReqAccion = ECocinaAccion::Ninguna;
+
+    /** Se incrementa en cada peticion para forzar OnRep aunque el resto no cambie. */
+    UPROPERTY(ReplicatedUsing = OnRep_Request)
+    int32 ReqNonce = 0;
+
+    /** Se ejecuta en el MC al recibir una nueva peticion. */
+    UFUNCTION()
+    void OnRep_Request();
+
+    /** Helper comun: fija los campos, incrementa el nonce y ejecuta ya si soy el MC. */
+    void SubmitCocinaRequest(AActor* Target, AIngrediente* Ing, ECocinaAccion Accion);
+
+    /** Ejecuta la accion autoritativa segun ReqAccion (solo debe llamarse en el MC). */
+    void DispatchCocinaRequest();
 
     UFUNCTION(BlueprintImplementableEvent, Category = "Cocina")
     void OnPlayerNameUpdated(const FString& NewName);

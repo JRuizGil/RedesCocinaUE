@@ -4,6 +4,7 @@
 #include "FusionActorComponent.h"
 #include "FusionOnlineSubsystem.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/EngineTypes.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
@@ -21,9 +22,9 @@ AEstacion::AEstacion()
     FusionComp->Ownership = EFusionObjectOwnerFlags::MasterClient;
 }
 
-void AEstacion::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out) const
+void AEstacion::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-    Super::GetLifetimeReplicatedProps(Out);
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AEstacion, Estado);
     DOREPLIFETIME(AEstacion, IngredienteActual);
     DOREPLIFETIME(AEstacion, StartTimestamp);
@@ -58,12 +59,41 @@ void AEstacion::RequestDepositar(APlayerCocina* Player, AIngrediente* Ing)
 {
     if (!Player || !Ing) return;
 
-    // Suelta el ingrediente localmente: dispara replicacion de Holder=null + posicion sobre la estacion.
-    Ing->RequestDrop(Player);
-    Ing->SetActorLocation(GetActorLocation() + FVector(0, 0, 60.f));
+    // Pre-validacion local: evita el bug de "patata aparece en estacion equivocada"
+    // cuando el cliente tenia Holder=Player por una replicacion atrasada del MC.
+    if (Ing->Holder != Player)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: RequestDepositar rechazado: no soy holder de %s"),
+               *GetNameSafe(this), *GetNameSafe(Ing));
+        return;
+    }
+    if (Estado != EEstadoEstacion::Libre)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: RequestDepositar rechazado: estado=%d"),
+               *GetNameSafe(this), (int32)Estado);
+        return;
+    }
+    if (Ing->Tipo != TipoEsperado)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: RequestDepositar rechazado: tipo %d != esperado %d"),
+               *GetNameSafe(this), (int32)Ing->Tipo, (int32)TipoEsperado);
+        return;
+    }
 
-    // El FusionNetDriver enruta este Server RPC al owner del actor (MC, por Ownership=MasterClient).
-    Server_TryDepositar(Ing);
+    // Posicion/rotacion donde queremos el ingrediente: encima de la estacion y
+    // alineado a ella (no a la mano).
+    const FVector PlaceLoc = GetActorLocation() + FVector(0, 0, 60.f);
+    const FRotator PlaceRot = GetActorRotation();
+
+    // Suelta el ingrediente localmente: dispara replicacion de Holder=null.
+    Ing->RequestDrop(Player);
+    // Reposicionar tras RequestDrop sobreescribe el detach (KeepWorldTransform).
+    // En el MC se vuelve a fijar de forma autoritativa cuando toma ownership.
+    Ing->SetActorLocationAndRotation(PlaceLoc, PlaceRot);
+
+    // Comunica la intencion al MC escribiendo una peticion replicada en el pawn
+    // (que el cliente local SI posee). Si el invocador ya es el MC, se ejecuta ya.
+    Player->SubmitDepositarEstacion(this, Ing);
 
     UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: RequestDepositar enviado al MC (Ing=%s)"),
            *GetNameSafe(this), *GetNameSafe(Ing));
@@ -73,25 +103,24 @@ void AEstacion::RequestRecoger(APlayerCocina* Player)
 {
     if (!Player) return;
     if (Estado != EEstadoEstacion::Listo) return;
-    Server_TryRecoger(Player);
+    if (!IngredienteActual) return;
+
+    // El jugador coge el ingrediente procesado como un pickup normal: toma ownership
+    // y se lo attacha en su propio cliente (asi luego podra soltarlo/depositarlo).
+    if (!IngredienteActual->RequestPickup(Player))
+    {
+        UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: RequestRecoger: pickup rechazado"), *GetNameSafe(this));
+        return;
+    }
+
+    // Notifica al MC para que resetee la estacion a Libre.
+    Player->SubmitRecogerEstacion(this);
     UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: RequestRecoger enviado al MC"), *GetNameSafe(this));
-}
-
-// ---------------- Server RPCs (se ejecutan en el MC) ----------------
-
-void AEstacion::Server_TryDepositar_Implementation(AIngrediente* Ing)
-{
-    MC_TryStartProcesado(Ing);
-}
-
-void AEstacion::Server_TryRecoger_Implementation(APlayerCocina* Player)
-{
-    MC_TryEntregarAJugador(Player);
 }
 
 // ---------------- Logica autoritativa (solo MC) ----------------
 
-void AEstacion::MC_TryStartProcesado(AIngrediente* Ing)
+void AEstacion::MC_HandleDepositar(AIngrediente* Ing)
 {
     UGameInstance* GI = GetGameInstance();
     UFusionOnlineSubsystem* Fusion = GI ? GI->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
@@ -99,28 +128,34 @@ void AEstacion::MC_TryStartProcesado(AIngrediente* Ing)
 
     if (Estado != EEstadoEstacion::Libre)
     {
-        UE_LOG(LogTemp, Log, TEXT("[Estacion] MC_TryStartProcesado rechazado: estado=%d"), (int32)Estado);
+        UE_LOG(LogTemp, Log, TEXT("[Estacion] MC_HandleDepositar rechazado: estado=%d"), (int32)Estado);
         return;
     }
     if (!Ing)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Estacion] MC_TryStartProcesado rechazado: Ing=null"));
+        UE_LOG(LogTemp, Warning, TEXT("[Estacion] MC_HandleDepositar rechazado: Ing=null"));
         return;
     }
     if (Ing->Tipo != TipoEsperado)
     {
-        UE_LOG(LogTemp, Log, TEXT("[Estacion] MC_TryStartProcesado rechazado: tipo %d != esperado %d"),
+        UE_LOG(LogTemp, Log, TEXT("[Estacion] MC_HandleDepositar rechazado: tipo %d != esperado %d"),
                (int32)Ing->Tipo, (int32)TipoEsperado);
         return;
     }
     if (Ing->Estado == EEstadoIngrediente::Procesado)
     {
-        UE_LOG(LogTemp, Log, TEXT("[Estacion] MC_TryStartProcesado rechazado: ya procesado"));
+        UE_LOG(LogTemp, Log, TEXT("[Estacion] MC_HandleDepositar rechazado: ya procesado"));
         return;
     }
 
     // El MC toma ownership del ingrediente para que nadie lo recoja durante el procesado.
     UFusionOnlineSubsystem::SetWantsOwner(Ing, true);
+
+    // Reposicion autoritativa: si la transform del cliente no llego o no replico,
+    // el MC fija el ingrediente sobre la estacion y alineado a ella.
+    Ing->SetActorLocationAndRotation(
+        GetActorLocation() + FVector(0, 0, 60.f),
+        GetActorRotation());
 
     IngredienteActual = Ing;
     StartTimestamp = Fusion->NetworkTime();
@@ -139,6 +174,9 @@ void AEstacion::MC_FinishProcesado()
     if (IngredienteActual)
     {
         IngredienteActual->SetProcesadoMC();
+        // Libera ownership: el ingrediente queda "suelto" sobre la estacion para que
+        // cualquier jugador pueda cogerlo (RequestPickup tomara ownership limpio).
+        UFusionOnlineSubsystem::SetWantsOwner(IngredienteActual, false);
     }
 
     OnRep_Estado();
@@ -152,23 +190,17 @@ void AEstacion::MC_FinishProcesado()
            *GetNameSafe(this), PuntosOtorgados);
 }
 
-void AEstacion::MC_TryEntregarAJugador(APlayerCocina* Player)
+void AEstacion::MC_HandleRecoger(APlayerCocina* Player)
 {
     UGameInstance* GI = GetGameInstance();
     UFusionOnlineSubsystem* Fusion = GI ? GI->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
     if (!Fusion || !Fusion->IsMasterClient()) return;
 
     if (Estado != EEstadoEstacion::Listo) return;
-    if (!IngredienteActual) return;
-    if (!Player) return;
 
-    AIngrediente* Ing = IngredienteActual;
-
-    // Libera ownership MC del ingrediente y asigna Holder al jugador.
-    // La replicacion de Holder hara que el cliente del Player ejecute AttachToHolder.
-    UFusionOnlineSubsystem::SetWantsOwner(Ing, false);
-    Ing->Holder = Player;
-
+    // El jugador ya tomo ownership del ingrediente y se lo attacho en su cliente
+    // (ver RequestRecoger). Aqui el MC solo resetea la estacion para que vuelva a
+    // estar disponible.
     IngredienteActual = nullptr;
     StartTimestamp = -1.0;
     Estado = EEstadoEstacion::Libre;
@@ -176,7 +208,7 @@ void AEstacion::MC_TryEntregarAJugador(APlayerCocina* Player)
     OnRep_IngredienteActual();
     OnRep_Estado();
 
-    UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: ENTREGADO a %s"),
+    UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: reseteada tras recoger de %s"),
            *GetNameSafe(this), *GetNameSafe(Player));
 }
 
@@ -198,7 +230,20 @@ void AEstacion::OnRep_Estado()
 
 void AEstacion::OnRep_IngredienteActual()
 {
-    // Hook visual opcional (efectos de "humo", luces, etc.). De momento, no-op.
+    // Mientras hay un ingrediente sobre la estacion (procesando o listo) apagamos
+    // su colision en todos los clientes: el sphere trace del Interactor atraviesa
+    // el ingrediente y detecta la estacion. Asi pulsar E mirando la zona llama a
+    // RequestRecoger (o RequestDepositar) en vez de "robar" via RequestPickup.
+    if (IngredienteActual)
+    {
+        if (UStaticMeshComponent* M = IngredienteActual->GetMesh())
+        {
+            M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        }
+    }
+    // Cuando IngredienteActual pasa a null: AttachToHolder (al entregarse) ya
+    // gestiona la colision, y al soltarse fuera de estacion DetachFromHolder
+    // la restaura a QueryAndPhysics.
 }
 
 void AEstacion::UpdateColorByEstado()

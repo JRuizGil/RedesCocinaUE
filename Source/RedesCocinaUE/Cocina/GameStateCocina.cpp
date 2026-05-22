@@ -1,4 +1,5 @@
 #include "Cocina/GameStateCocina.h"
+#include "Cocina/RecetaAsset.h"
 #include "FusionOnlineSubsystem.h"
 #include "Net/UnrealNetwork.h"
 
@@ -24,6 +25,12 @@ bool AGameStateCocina::EnsureMC(const TCHAR* Op) const
     if (Fusion && Fusion->IsMasterClient()) return true;
     UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] %s ignorado: no soy MC"), Op);
     return false;
+}
+
+URecetaAsset* AGameStateCocina::GetRecetaActiva() const
+{
+    if (RecetaActivaIndex < 0 || RecetaActivaIndex >= Recetas.Num()) return nullptr;
+    return Recetas[RecetaActivaIndex];
 }
 
 void AGameStateCocina::IniciarPartidaMC()

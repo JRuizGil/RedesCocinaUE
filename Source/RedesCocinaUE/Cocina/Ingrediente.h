@@ -43,6 +43,10 @@ public:
     UPROPERTY(ReplicatedUsing = OnRep_Holder, BlueprintReadOnly, Category = "Cocina")
     TObjectPtr<APlayerCocina> Holder = nullptr;
 
+    /** true cuando ya esta colocado en el plato (zona de emplatado). No se puede recoger. */
+    UPROPERTY(ReplicatedUsing = OnRep_EnPlato, BlueprintReadOnly, Category = "Cocina")
+    bool bEnPlato = false;
+
     /** Socket en el SkeletalMesh del Pawn al que se attacha el ingrediente. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cocina")
     FName HandSocketName = TEXT("hand_r");
@@ -71,6 +75,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Cocina|MC")
     void SetProcesadoMC();
 
+    /** Llamado por la zona de emplatado (Master Client) al colocarlo en el plato. */
+    UFUNCTION(BlueprintCallable, Category = "Cocina|MC")
+    void SetEnPlatoMC();
+
     UStaticMeshComponent* GetMesh() const { return Mesh; }
 
 protected:
@@ -79,9 +87,7 @@ protected:
 
     UFUNCTION() void OnRep_Estado();
     UFUNCTION() void OnRep_Holder();
-
-    /** Se invoca cuando Fusion nos concede ownership tras un SetWantsOwner(true). */
-    UFUNCTION() void HandleOwnerGiven();
+    UFUNCTION() void OnRep_EnPlato();
 
     /** Actualiza color/material segun Estado. */
     UFUNCTION(BlueprintCallable, Category = "Cocina|FX")

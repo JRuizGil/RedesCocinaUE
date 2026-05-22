@@ -3,7 +3,9 @@
     "allow": [
       "WebFetch(domain:meadow-reaper-dd6.notion.site)",
       "mcp__claude_ai_Notion__notion-fetch",
-      "Bash(rm \"Source/RedesCocinaUE/RedesCocinaUEGameMode.h\" \"Source/RedesCocinaUE/RedesCocinaUEGameMode.cpp\")"
+      "Bash(rm \"Source/RedesCocinaUE/RedesCocinaUEGameMode.h\" \"Source/RedesCocinaUE/RedesCocinaUEGameMode.cpp\")",
+      "PowerShell(& \"C:\\\\Program Files\\\\Epic Games\\\\UE_5.6\\\\Engine\\\\Build\\\\BatchFiles\\\\Build.bat\" RedesCocinaUEEditor Win64 Development -project=\"C:\\\\Users\\\\zanah\\\\Documents\\\\Unreal Projects\\\\RedesCocinaUE\\\\RedesCocinaUE.uproject\" -waitmutex 2>&1)",
+      "Bash(grep -iv \"//\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\JoseRamonRuizGil\\Documents\\Unreal Projects\\RedesCocinaUE\\Source\\RedesCocinaUE"

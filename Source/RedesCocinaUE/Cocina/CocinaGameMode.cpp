@@ -44,6 +44,7 @@ void ACocinaGameMode::PostLogin(APlayerController* NewPlayer)
                 if (AGameStateCocina* G = GetGameState<AGameStateCocina>())
                 {
                     G->IniciarPartidaMC();
+                    G->SetRecetaActivaMC(0); // arranca con la primera receta del catalogo
                 }
             }
         }), 3.0f, false);

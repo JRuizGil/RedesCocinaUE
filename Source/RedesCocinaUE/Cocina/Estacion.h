@@ -57,12 +57,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Cocina")
     void RequestRecoger(APlayerCocina* Player);
 
-    /** Server RPCs enrutados al MC por el FusionNetDriver (la estacion tiene Ownership=MasterClient). */
-    UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Cocina")
-    void Server_TryDepositar(AIngrediente* Ing);
-
-    UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Cocina")
-    void Server_TryRecoger(APlayerCocina* Player);
+    // --- Caminos autoritativos: el MC los ejecuta. Llamados desde PlayerCocina::OnRep_Request
+    //     (cuando un cliente no-MC pide la accion) o directamente si el invocador ya es el MC.
+    //     No usamos Server RPC: en Fusion shared mode no cruzan la red de forma fiable. ---
+    void MC_HandleDepositar(AIngrediente* Ing);
+    void MC_HandleRecoger(APlayerCocina* Player);
 
     /** Progreso [0..1] del procesado. Funciona en cualquier cliente porque usa NetworkTime. */
     UFUNCTION(BlueprintPure, Category = "Cocina")
@@ -78,10 +77,8 @@ protected:
 
     void UpdateColorByEstado();
 
-    // --- Caminos autoritativos: solo se ejecutan si IsMasterClient() ---
-    void MC_TryStartProcesado(AIngrediente* Ing);
+    // --- Logica interna del MC ---
     void MC_FinishProcesado();
-    void MC_TryEntregarAJugador(APlayerCocina* Player);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cocina")
     TObjectPtr<UStaticMeshComponent> Mesh;
