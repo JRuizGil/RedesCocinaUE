@@ -12,6 +12,7 @@ class REDESCOCINAUE_API ACocinaGameMode : public AGameModeBase
 public:
     ACocinaGameMode();
 
+    virtual void Tick(float DeltaTime) override;
     virtual void PostLogin(APlayerController* NewPlayer) override;
     virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 

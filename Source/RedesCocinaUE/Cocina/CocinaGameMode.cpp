@@ -10,6 +10,7 @@ ACocinaGameMode::ACocinaGameMode()
 {
     DefaultPawnClass = APlayerCocina::StaticClass();
     GameStateClass = AGameStateCocina::StaticClass();
+    PrimaryActorTick.bCanEverTick = true;
 }
 
 AActor* ACocinaGameMode::ChoosePlayerStart_Implementation(AController* Player)
@@ -42,6 +43,22 @@ AActor* ACocinaGameMode::ChoosePlayerStart_Implementation(AController* Player)
     UE_LOG(LogTemp, Log, TEXT("[CocinaGameMode] ChoosePlayerStart -> %s (index %d de %d)"),
            *GetNameSafe(Starts[Index]), Index, Starts.Num());
     return Starts[Index];
+}
+
+void ACocinaGameMode::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+    
+    UFusionOnlineSubsystem* Fusion = GetGameInstance()->GetSubsystem<UFusionOnlineSubsystem>();
+    if (!Fusion || !Fusion->IsMasterClient()) return;
+
+    AGameStateCocina* GS = GetGameState<AGameStateCocina>();
+    if (!GS || GS->EstadoPartida != EEstadoPartida::EnCurso) return;
+    
+    if (GS->GetTiempoRestante() <= 0.f)
+    {
+        GS->FinalizarPartidaMC();
+    }
 }
 
 void ACocinaGameMode::PostLogin(APlayerController* NewPlayer)

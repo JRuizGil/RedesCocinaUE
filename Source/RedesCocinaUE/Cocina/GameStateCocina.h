@@ -60,6 +60,15 @@ public:
     UFUNCTION(BlueprintPure, Category="Cocina")
     float GetTiempoRestante() const;
 
+    UFUNCTION(BlueprintImplementableEvent, Category="Cocina")
+    void K2_OnPuntuacionCambio(int32 NuevaPuntuacion);
+
+    UFUNCTION(BlueprintImplementableEvent, Category="Cocina")
+    void K2_OnEstadoPartidaCambio(EEstadoPartida Nuevo);
+
+    UFUNCTION(BlueprintImplementableEvent, Category="Cocina")
+    void K2_OnRecetaCambio(int32 NuevoIndice);
+
 protected:
     UFUNCTION() void OnRep_StartTimestamp();
     UFUNCTION() void OnRep_EstadoPartida();

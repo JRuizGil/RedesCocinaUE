@@ -81,6 +81,18 @@ float AGameStateCocina::GetTiempoRestante() const
 }
 
 void AGameStateCocina::OnRep_StartTimestamp() {}
-void AGameStateCocina::OnRep_EstadoPartida() {}
-void AGameStateCocina::OnRep_Puntuacion() {}
-void AGameStateCocina::OnRep_RecetaActiva() {}
+
+void AGameStateCocina::OnRep_EstadoPartida()
+{
+    K2_OnEstadoPartidaCambio(EstadoPartida);
+}
+
+void AGameStateCocina::OnRep_Puntuacion()
+{
+    K2_OnPuntuacionCambio(Puntuacion);
+}
+
+void AGameStateCocina::OnRep_RecetaActiva()
+{
+    K2_OnRecetaCambio(RecetaActivaIndex);
+}
