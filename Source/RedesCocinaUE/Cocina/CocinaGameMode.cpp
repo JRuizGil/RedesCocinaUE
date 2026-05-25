@@ -13,6 +13,12 @@ ACocinaGameMode::ACocinaGameMode()
     PrimaryActorTick.bCanEverTick = true;
 }
 
+void ACocinaGameMode::BeginPlay()
+{
+    Super::BeginPlay();
+    UE_LOG(LogTemp, Error, TEXT("[CocinaGameMode] ACocinaGameMode::BeginPlay() called."));
+}
+
 AActor* ACocinaGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
     TArray<APlayerStart*> Starts;
@@ -64,27 +70,59 @@ void ACocinaGameMode::Tick(float DeltaTime)
 void ACocinaGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
+    
+    // Log ANTES de cualquier comprobación para asegurar que PostLogin se ejecuta
+    UE_LOG(LogTemp, Error, TEXT("[CocinaGameMode] ========== PostLogin() INICIADO =========="));
 
     UFusionOnlineSubsystem* Fusion = GetGameInstance()->GetSubsystem<UFusionOnlineSubsystem>();
-    if (!Fusion || !Fusion->IsMasterClient()) return;
+    if (!Fusion) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[CocinaGameMode] PostLogin() FALLIDO: Fusion es nullptr"));
+        return;
+    }
+    
+    bool bIsMC = Fusion->IsMasterClient();
+    UE_LOG(LogTemp, Warning, TEXT("[CocinaGameMode] PostLogin() Fusion=%p, IsMasterClient=%d, PlayerCount=%d"), Fusion, bIsMC, Fusion->PlayerCount());
+    
+    if (!bIsMC)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[CocinaGameMode] PostLogin() IGNORADO: No soy MasterClient"));
+        return;
+    }
 
     AGameStateCocina* GS = GetGameState<AGameStateCocina>();
-    if (!GS) return;
+    if (!GS) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[CocinaGameMode] PostLogin() FALLIDO: GameState es nullptr"));
+        return;
+    }
+    
+    UE_LOG(LogTemp, Warning, TEXT("[CocinaGameMode] PostLogin() Comprobando: EstadoPartida=%d, PlayerCount=%d"), static_cast<int32>(GS->EstadoPartida), Fusion->PlayerCount());
 
     if (GS->EstadoPartida == EEstadoPartida::Esperando && Fusion->PlayerCount() >= 1)
     {
+        UE_LOG(LogTemp, Warning, TEXT("[CocinaGameMode] PostLogin() CONDICIÓN VERDADERA: Setting timer de 3s para IniciarPartidaMC()"));
         FTimerHandle Handle;
         GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateLambda([this]
         {
+            UE_LOG(LogTemp, Warning, TEXT("[CocinaGameMode] PostLogin Timer ejecutándose después de 3s"));
             if (UFusionOnlineSubsystem* F = GetGameInstance()->GetSubsystem<UFusionOnlineSubsystem>())
             {
-                if (!F->IsMasterClient()) return;
+                if (!F->IsMasterClient()) 
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("[CocinaGameMode] Timer: No soy MC ya"));
+                    return;
+                }
                 if (AGameStateCocina* G = GetGameState<AGameStateCocina>())
                 {
                     G->IniciarPartidaMC();
-                    G->SetRecetaActivaMC(0); // arranca con la primera receta del catalogo
+                    G->SetRecetaActivaMC(0);
                 }
             }
         }), 3.0f, false);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[CocinaGameMode] PostLogin() CONDICIÓN FALSA: EstadoPartida=%d (debe ser 0), PlayerCount=%d (debe ser >= 1)"), static_cast<int32>(GS->EstadoPartida), Fusion->PlayerCount());
     }
 }

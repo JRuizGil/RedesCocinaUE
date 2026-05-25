@@ -35,13 +35,23 @@ URecetaAsset* AGameStateCocina::GetRecetaActiva() const
 
 void AGameStateCocina::IniciarPartidaMC()
 {
-    if (!EnsureMC(TEXT("IniciarPartidaMC"))) return;
-    if (EstadoPartida != EEstadoPartida::Esperando) return;
+    UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] IniciarPartidaMC() llamado"));
+    if (!EnsureMC(TEXT("IniciarPartidaMC"))) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] IniciarPartidaMC() FALLIDO: No soy MasterClient"));
+        return;
+    }
+    if (EstadoPartida != EEstadoPartida::Esperando) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] IniciarPartidaMC() FALLIDO: EstadoPartida es %d (debe ser 0=Esperando)"), static_cast<int32>(EstadoPartida));
+        return;
+    }
 
     UFusionOnlineSubsystem* Fusion = GetGameInstance()->GetSubsystem<UFusionOnlineSubsystem>();
     StartTimestamp = Fusion->NetworkTime();
     EstadoPartida = EEstadoPartida::EnCurso;
     Puntuacion = 0;
+    UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] IniciarPartidaMC() ÉXITO: StartTimestamp=%.2f, EstadoPartida cambiado a 1=EnCurso"), StartTimestamp);
     OnRep_StartTimestamp();
     OnRep_EstadoPartida();
     OnRep_Puntuacion();
@@ -72,18 +82,36 @@ void AGameStateCocina::FinalizarPartidaMC()
 
 float AGameStateCocina::GetTiempoRestante() const
 {
-    if (EstadoPartida == EEstadoPartida::Esperando) return DuracionPartida;
-    if (EstadoPartida == EEstadoPartida::Finalizada) return 0.f;
+    if (EstadoPartida == EEstadoPartida::Esperando) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] GetTiempoRestante() -> EstadoPartida=ESPERANDO, devolviendo 120"));
+        return DuracionPartida;
+    }
+    if (EstadoPartida == EEstadoPartida::Finalizada) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] GetTiempoRestante() -> EstadoPartida=FINALIZADA, devolviendo 0"));
+        return 0.f;
+    }
     UFusionOnlineSubsystem* Fusion = GetGameInstance() ? GetGameInstance()->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
-    if (!Fusion || StartTimestamp < 0) return DuracionPartida;
+    if (!Fusion || StartTimestamp < 0) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] GetTiempoRestante() -> Fusion=%p, StartTimestamp=%.2f -> FALLBACK 120"), Fusion, StartTimestamp);
+        return DuracionPartida;
+    }
     const double Elapsed = Fusion->NetworkTime() - StartTimestamp;
-    return FMath::Max(0.f, DuracionPartida - static_cast<float>(Elapsed));
+    const float Restante = FMath::Max(0.f, DuracionPartida - static_cast<float>(Elapsed));
+    UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] GetTiempoRestante() -> NetworkTime=%.2f, StartTS=%.2f, Elapsed=%.2f, Restante=%.2f"), Fusion->NetworkTime(), StartTimestamp, Elapsed, Restante);
+    return Restante;
 }
 
-void AGameStateCocina::OnRep_StartTimestamp() {}
+void AGameStateCocina::OnRep_StartTimestamp() 
+{
+    UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] OnRep_StartTimestamp() -> StartTimestamp=%.2f"), StartTimestamp);
+}
 
 void AGameStateCocina::OnRep_EstadoPartida()
 {
+    UE_LOG(LogTemp, Warning, TEXT("[GameStateCocina] OnRep_EstadoPartida() -> EstadoPartida=%d (0=Esperando, 1=EnCurso, 2=Finalizada)"), static_cast<int32>(EstadoPartida));
     K2_OnEstadoPartidaCambio(EstadoPartida);
 }
 
