@@ -13,7 +13,9 @@
       "Bash(where pandoc *)",
       "Bash(where soffice *)",
       "Bash(py --version)",
-      "PowerShell(try { $w = New-Object -ComObject Word.Application; \"WORD_OK $\\($w.Version\\)\"; $w.Quit\\(\\) } catch { \"NO_WORD\" })"
+      "PowerShell(try { $w = New-Object -ComObject Word.Application; \"WORD_OK $\\($w.Version\\)\"; $w.Quit\\(\\) } catch { \"NO_WORD\" })",
+      "PowerShell($pkg = \"C:\\\\Users\\\\zanah\\\\Documents\\\\Unreal Projects\\\\Packages\\\\asfddaf\\\\Windows\"; Write-Output \"=== Raiz del paquete ===\"; if \\(Test-Path $pkg\\) { Get-ChildItem $pkg | Select-Object Name,Length,Mode | Format-Table -AutoSize } else { Write-Output \"NO EXISTE: $pkg\" }; Write-Output \"=== Binario interno ===\"; $bin = Join-Path $pkg \"RedesCocinaUE\\\\Binaries\\\\Win64\"; if \\(Test-Path $bin\\) { Get-ChildItem $bin | Select-Object Name,Length | Format-Table -AutoSize } else { Write-Output \"NO EXISTE carpeta: $bin\" })",
+      "PowerShell(Start-Process \"windowsdefender://smartappcontrol\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\JoseRamonRuizGil\\Documents\\Unreal Projects\\RedesCocinaUE\\Source\\RedesCocinaUE"
