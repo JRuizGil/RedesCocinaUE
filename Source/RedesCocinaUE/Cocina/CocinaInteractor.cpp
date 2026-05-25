@@ -80,15 +80,15 @@ void UCocinaInteractor::OnInteractPressed()
             Est->RequestDepositar(OwnerPawn, Held);
             UE_LOG(LogTemp, Log, TEXT("[Interactor] Depositar en %s"), *GetNameSafe(Est));
         }
-        else if (Est->Estado == EEstadoEstacion::Listo)
+        else if (Est->TieneListo())
         {
             Est->RequestRecoger(OwnerPawn);
             UE_LOG(LogTemp, Log, TEXT("[Interactor] Recoger de %s"), *GetNameSafe(Est));
         }
         else
         {
-            UE_LOG(LogTemp, Log, TEXT("[Interactor] Estacion %s no aceptable (estado=%d, manos vacias)"),
-                   *GetNameSafe(Est), (int32)Est->Estado);
+            UE_LOG(LogTemp, Log, TEXT("[Interactor] Estacion %s no aceptable (manos vacias, nada listo)"),
+                   *GetNameSafe(Est));
         }
         return;
     }

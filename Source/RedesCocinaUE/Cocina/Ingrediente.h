@@ -47,6 +47,19 @@ public:
     UPROPERTY(ReplicatedUsing = OnRep_EnPlato, BlueprintReadOnly, Category = "Cocina")
     bool bEnPlato = false;
 
+    /** true mientras esta posado en una estacion (cocinandose o listo). Apaga colision
+     *  para que el trace del jugador detecte la estacion y no el ingrediente. */
+    UPROPERTY(ReplicatedUsing = OnRep_EnEstacion, BlueprintReadOnly, Category = "Cocina")
+    bool bEnEstacion = false;
+
+    /** NetworkTime en que empezo a procesarse en una estacion. -1 si no aplica. */
+    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Cocina")
+    double ProcInicio = -1.0;
+
+    /** Duracion del procesado (segundos) fijada por la estacion al depositarlo. */
+    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Cocina")
+    float ProcDuracion = 0.f;
+
     /** Socket en el SkeletalMesh del Pawn al que se attacha el ingrediente. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cocina")
     FName HandSocketName = TEXT("hand_r");
@@ -79,6 +92,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Cocina|MC")
     void SetEnPlatoMC();
 
+    /** Llamado por la estacion (MC) al posarlo en un slot: posicion, rotacion y timer. */
+    void SetEnEstacionMC(const FVector& Loc, const FRotator& Rot, float Duracion, double Inicio);
+
+    /** Progreso [0..1] del procesado de ESTE ingrediente. Funciona en cualquier cliente. */
+    UFUNCTION(BlueprintPure, Category = "Cocina")
+    float GetProgresoProcesado01() const;
+
     UStaticMeshComponent* GetMesh() const { return Mesh; }
 
 protected:
@@ -88,6 +108,7 @@ protected:
     UFUNCTION() void OnRep_Estado();
     UFUNCTION() void OnRep_Holder();
     UFUNCTION() void OnRep_EnPlato();
+    UFUNCTION() void OnRep_EnEstacion();
 
     /** Actualiza color/material segun Estado. */
     UFUNCTION(BlueprintCallable, Category = "Cocina|FX")

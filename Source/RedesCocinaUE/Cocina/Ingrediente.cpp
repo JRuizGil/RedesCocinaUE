@@ -30,6 +30,9 @@ void AIngrediente::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
     DOREPLIFETIME(AIngrediente, Estado);
     DOREPLIFETIME(AIngrediente, Holder);
     DOREPLIFETIME(AIngrediente, bEnPlato);
+    DOREPLIFETIME(AIngrediente, bEnEstacion);
+    DOREPLIFETIME(AIngrediente, ProcInicio);
+    DOREPLIFETIME(AIngrediente, ProcDuracion);
 }
 
 void AIngrediente::BeginPlay()
@@ -73,6 +76,11 @@ bool AIngrediente::RequestPickup(APlayerCocina* Requester)
     UE_LOG(LogTemp, Log, TEXT("[Ingrediente] RequestPickup ok. Dist=%.1f. SetWantsOwner(true)..."), Dist);
     UFusionOnlineSubsystem::SetWantsOwner(this, true);
 
+    // Si venia de una estacion (recoger), deja de estar posado en ella.
+    bEnEstacion = false;
+    ProcInicio = -1.0;
+    ProcDuracion = 0.f;
+
     // Workaround: en Fusion Shared con actores placed-in-level, OnOwnerWasGiven
     // no siempre dispara. Forzamos el attach inmediato. La replicacion de Holder
     // se encarga de mostrarlo en los demas clientes cuando la transferencia llega.
@@ -83,12 +91,14 @@ bool AIngrediente::RequestPickup(APlayerCocina* Requester)
 
 bool AIngrediente::RequestDrop(APlayerCocina* Requester)
 {
-    if (!UFusionOnlineSubsystem::IsOwner(this)) return false;
+    // Basta con que lo lleve yo. NO exigimos IsOwner: en Fusion shared el pickup de
+    // actores placed-in-level fija Holder localmente pero la ownership no siempre se
+    // concede, lo que dejaba el ingrediente "pegado" a la mano sin poder soltarlo.
     if (Holder != Requester) return false;
 
     Holder = nullptr;
-    OnRep_Holder();
-    UFusionOnlineSubsystem::SetWantsOwner(this, false);
+    OnRep_Holder();                                       // detach local inmediato
+    UFusionOnlineSubsystem::SetWantsOwner(this, false);   // libera ownership (best-effort)
     return true;
 }
 
@@ -124,6 +134,45 @@ void AIngrediente::OnRep_EnPlato()
     {
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     }
+}
+
+void AIngrediente::SetEnEstacionMC(const FVector& Loc, const FRotator& Rot, float Duracion, double Inicio)
+{
+    UGameInstance* GI = GetGameInstance();
+    UFusionOnlineSubsystem* Fusion = GI ? GI->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
+    if (!Fusion || !Fusion->IsMasterClient()) return;
+
+    SetActorLocationAndRotation(Loc, Rot);
+    ProcDuracion = Duracion;
+    ProcInicio = Inicio;
+    bEnEstacion = true;
+    OnRep_EnEstacion();
+}
+
+void AIngrediente::OnRep_EnEstacion()
+{
+    if (!Mesh) return;
+    if (bEnEstacion)
+    {
+        // Posado en estacion: sin colision, asi el trace del jugador detecta la estacion.
+        Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
+    else if (!Holder && !bEnPlato)
+    {
+        // Ya no esta en la estacion ni en mano ni en plato: vuelve a ser interactuable.
+        Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    }
+}
+
+float AIngrediente::GetProgresoProcesado01() const
+{
+    if (Estado == EEstadoIngrediente::Procesado) return 1.f;
+    if (ProcInicio < 0.0 || ProcDuracion <= 0.f) return 0.f;
+    UGameInstance* GI = GetGameInstance();
+    UFusionOnlineSubsystem* Fusion = GI ? GI->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
+    if (!Fusion) return 0.f;
+    const double E = Fusion->NetworkTime() - ProcInicio;
+    return FMath::Clamp(static_cast<float>(E / ProcDuracion), 0.f, 1.f);
 }
 
 void AIngrediente::OnRep_Estado()
