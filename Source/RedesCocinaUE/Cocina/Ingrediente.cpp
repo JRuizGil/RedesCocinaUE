@@ -39,10 +39,14 @@ void AIngrediente::BeginPlay()
 {
     Super::BeginPlay();
 
-    // NOTA: no enganchamos OnOwnerWasGiven. Ese delegate disparaba en CUALQUIER
-    // cliente que ganara ownership (incluido el MC al tomar el ingrediente para
-    // procesarlo), agarrandolo a la mano del pawn local. El attach de pickup ya se
-    // hace de forma explicita en RequestPickup.
+    // Enganchamos OnOwnerWasGiven SOLO para propagar Holder al resto cuando se nos
+    // concede el ownership tras un pickup local intencionado (guard bPendingLocalPickup).
+    // Sin ese guard, el delegate disparaba tambien cuando el MC toma ownership para
+    // procesar y agarraba el ingrediente a la mano del pawn local.
+    if (FusionComp)
+    {
+        FusionComp->OnOwnerWasGiven.AddDynamic(this, &AIngrediente::HandleOwnerGiven);
+    }
     UpdateVisualByEstado();
 }
 
@@ -74,6 +78,10 @@ bool AIngrediente::RequestPickup(APlayerCocina* Requester)
     }
 
     UE_LOG(LogTemp, Log, TEXT("[Ingrediente] RequestPickup ok. Dist=%.1f. SetWantsOwner(true)..."), Dist);
+
+    // Marca de pickup local intencionado: cuando Fusion nos conceda el ownership,
+    // HandleOwnerGiven re-afirma Holder para que el resto de clientes lo vean en mi mano.
+    bPendingLocalPickup = true;
     UFusionOnlineSubsystem::SetWantsOwner(this, true);
 
     // Si venia de una estacion (recoger), deja de estar posado en ella.
@@ -81,9 +89,9 @@ bool AIngrediente::RequestPickup(APlayerCocina* Requester)
     ProcInicio = -1.0;
     ProcDuracion = 0.f;
 
-    // Workaround: en Fusion Shared con actores placed-in-level, OnOwnerWasGiven
-    // no siempre dispara. Forzamos el attach inmediato. La replicacion de Holder
-    // se encarga de mostrarlo en los demas clientes cuando la transferencia llega.
+    // Attach optimista inmediato: el cliente que coge controla el transform (pegado a su
+    // propia mano). NO enrutamos por el MC: si el MC autoriza el transform de un actor
+    // sujeto a una mano remota, lo coloca lejos de la mano en la vista del cliente.
     Holder = Requester;
     OnRep_Holder();
     return true;
@@ -102,6 +110,29 @@ bool AIngrediente::RequestDrop(APlayerCocina* Requester)
     return true;
 }
 
+void AIngrediente::HandleOwnerGiven()
+{
+    // Solo nos interesa cuando ESTE cliente acaba de coger el ingrediente del mundo y
+    // por fin se le concede el ownership. El guard evita que dispare cuando el MC toma
+    // ownership para procesar (que agarraria el ingrediente a la mano del pawn local).
+    if (!bPendingLocalPickup) return;
+    bPendingLocalPickup = false;
+
+    // Si entre medias lo solte o cambio de manos, no hago nada.
+    if (!Holder || !Holder->IsLocallyControlled()) return;
+
+    // Ya somos owner Fusion: re-afirmamos el attach y forzamos la copia de estado para
+    // que Holder (puesto de forma optimista al coger) se replique al resto de clientes.
+    OnRep_Holder();
+    if (FusionComp)
+    {
+        FusionComp->CopyLocalStateNextFrame();
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[Ingrediente] %s: ownership concedido, Holder re-afirmado=%s"),
+           *GetNameSafe(this), *GetNameSafe(Holder));
+}
+
 void AIngrediente::SetProcesadoMC()
 {
     UGameInstance* GI = GetGameInstance();
@@ -113,13 +144,28 @@ void AIngrediente::SetProcesadoMC()
     OnRep_Estado();
 }
 
-void AIngrediente::SetEnPlatoMC()
+void AIngrediente::SetEnPlatoMC(const FVector& Loc)
 {
     UGameInstance* GI = GetGameInstance();
     UFusionOnlineSubsystem* Fusion = GI ? GI->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
     if (!Fusion || !Fusion->IsMasterClient()) return;
     if (bEnPlato) return;
 
+    // 1) Desengancha de la mano autoritativamente. El MC ya es owner (la zona llamo
+    //    SetWantsOwner antes), asi que esta escritura de Holder=null SI replica a todos.
+    //    Sin esto, si el MC tomo ownership antes de recibir el Holder=null del cliente,
+    //    el ingrediente quedaba pegado a la mano en la vista del MC.
+    if (Holder)
+    {
+        Holder = nullptr;
+        OnRep_Holder(); // DetachFromHolder (KeepWorldTransform) en el MC
+    }
+
+    // 2) Coloca en el plato (ya desenganchado, sin pelear con el socket de la mano).
+    bEnEstacion = false;
+    SetActorLocation(Loc);
+
+    // 3) Marca emplatado (escala reducida + sin colision via OnRep_EnPlato).
     bEnPlato = true;
     OnRep_EnPlato();
 }

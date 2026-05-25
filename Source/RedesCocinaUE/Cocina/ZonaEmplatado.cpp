@@ -83,11 +83,11 @@ void AZonaEmplatado::MC_HandleAgregar(AIngrediente* Ing)
     // El MC toma ownership para colocar y marcar el ingrediente de forma autoritativa.
     UFusionOnlineSubsystem::SetWantsOwner(Ing, true);
 
-    // Coloca en una rejilla simple sobre la zona (3 por fila).
+    // Coloca en una rejilla simple sobre la zona (3 por fila). SetEnPlatoMC desengancha
+    // de la mano, posiciona y marca emplatado de forma autoritativa (en este orden).
     const int32 Idx = PlatoActual.Num();
     const FVector Offset(((Idx % 3) - 1) * 30.f, (Idx / 3) * 30.f, AlturaPlato);
-    Ing->SetActorLocation(GetActorLocation() + Offset);
-    Ing->SetEnPlatoMC();
+    Ing->SetEnPlatoMC(GetActorLocation() + Offset);
 
     PlatoActual.Add(Ing->Tipo);
     OnRep_PlatoActual();

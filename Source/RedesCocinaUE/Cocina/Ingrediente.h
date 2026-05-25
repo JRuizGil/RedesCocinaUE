@@ -88,9 +88,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Cocina|MC")
     void SetProcesadoMC();
 
-    /** Llamado por la zona de emplatado (Master Client) al colocarlo en el plato. */
-    UFUNCTION(BlueprintCallable, Category = "Cocina|MC")
-    void SetEnPlatoMC();
+    /** Llamado por la zona de emplatado (Master Client) al colocarlo en el plato.
+     *  El MC (owner) desengancha de la mano, posiciona y marca emplatado de forma
+     *  autoritativa, asi el detach replica a todas las vistas (no solo a quien empla). */
+    void SetEnPlatoMC(const FVector& Loc);
 
     /** Llamado por la estacion (MC) al posarlo en un slot: posicion, rotacion y timer. */
     void SetEnEstacionMC(const FVector& Loc, const FRotator& Rot, float Duracion, double Inicio);
@@ -114,12 +115,20 @@ protected:
     UFUNCTION() void OnRep_EnPlato();
     UFUNCTION() void OnRep_EnEstacion();
 
+    /** Se invoca cuando Fusion nos concede ownership tras un SetWantsOwner(true). Re-afirma
+     *  Holder para que el pickup local se vea en el resto de clientes (guard abajo). */
+    UFUNCTION() void HandleOwnerGiven();
+
     /** Actualiza color/material segun Estado. */
     UFUNCTION(BlueprintCallable, Category = "Cocina|FX")
     void UpdateVisualByEstado();
 
     void AttachToHolder();
     void DetachFromHolder();
+
+    /** true entre el pickup local y la concesion de ownership; lo consume HandleOwnerGiven.
+     *  No replicado: es intencion local del cliente que coge. */
+    bool bPendingLocalPickup = false;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cocina")
     TObjectPtr<UStaticMeshComponent> Mesh;
