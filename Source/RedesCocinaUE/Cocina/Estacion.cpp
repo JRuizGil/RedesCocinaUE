@@ -109,20 +109,17 @@ void AEstacion::RequestDepositar(APlayerCocina* Player, AIngrediente* Ing)
 void AEstacion::RequestRecoger(APlayerCocina* Player)
 {
     if (!Player) return;
-    if (!ProximoListo)
+    if (NumListos <= 0)
     {
         UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: recoger sin nada listo"), *GetNameSafe(this));
         return;
     }
 
-    // El jugador coge el ingrediente listo (toma ownership en su cliente).
-    if (!ProximoListo->RequestPickup(Player))
-    {
-        UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: recoger: pickup rechazado"), *GetNameSafe(this));
-        return;
-    }
-
-    // Notifica al MC para que libere el hueco.
+    // NO hacemos pickup local optimista: el ingrediente lo posee el MC, asi que el
+    // cliente no puede escribir su Holder (no replicaria). Es el MC quien entrega el
+    // ingrediente de forma autoritativa y la replicacion de Holder lo engancha a la
+    // mano en TODOS los clientes (incluido el MC). El cliente que recoge reclama
+    // ownership en AIngrediente::OnRep_Holder al recibirlo.
     Player->SubmitRecogerEstacion(this);
     UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: recoger enviado al MC"), *GetNameSafe(this));
 }
@@ -177,23 +174,34 @@ void AEstacion::MC_HandleRecoger(APlayerCocina* Player)
     UGameInstance* GI = GetGameInstance();
     UFusionOnlineSubsystem* Fusion = GI ? GI->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
     if (!Fusion || !Fusion->IsMasterClient()) return;
+    if (!Player) return;
 
-    // Quita de su hueco el ingrediente que el cliente acaba de recoger (el que estaba Listo).
-    // El cliente ya tomo ownership y limpio bEnEstacion en RequestPickup; aqui solo liberamos
-    // el hueco en la lista MC.
+    // Entrega el ingrediente recogible (ProximoListo) al jugador. Guard: si ya tiene
+    // Holder, otra peticion concurrente lo entrego primero -> ignora (anti doble-recoger).
+    AIngrediente* Ing = ProximoListo;
+    if (!Ing || Ing->Holder != nullptr)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: recoger ignorado (nada listo o ya entregado)"),
+               *GetNameSafe(this));
+        return;
+    }
+
+    // Libera el hueco que ocupaba en la lista MC.
     for (int32 i = 0; i < SlotsMC.Num(); ++i)
     {
-        AIngrediente* Ing = SlotsMC[i];
-        if (Ing && (Ing == ProximoListo || Ing->Holder == Player || !Ing->bEnEstacion))
+        if (SlotsMC[i] == Ing)
         {
             SlotsMC[i] = nullptr;
             break;
         }
     }
 
+    // Entrega autoritativa: el MC (owner) fija Holder -> replica a todos los clientes.
+    Ing->EntregarAJugadorMC(Player);
+
     RecalcularConteoMC();
-    UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: hueco liberado tras recoger (ocupados=%d)"),
-           *GetNameSafe(this), NumOcupados);
+    UE_LOG(LogTemp, Log, TEXT("[Estacion] %s: %s entregado a %s (ocupados=%d)"),
+           *GetNameSafe(this), *GetNameSafe(Ing), *GetNameSafe(Player), NumOcupados);
 }
 
 void AEstacion::RecalcularConteoMC()

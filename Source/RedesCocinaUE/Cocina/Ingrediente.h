@@ -95,6 +95,10 @@ public:
     /** Llamado por la estacion (MC) al posarlo en un slot: posicion, rotacion y timer. */
     void SetEnEstacionMC(const FVector& Loc, const FRotator& Rot, float Duracion, double Inicio);
 
+    /** Llamado por la estacion (MC) al entregar el ingrediente listo a un jugador.
+     *  El MC es owner del ingrediente, asi que su escritura de Holder SI replica a todos. */
+    void EntregarAJugadorMC(APlayerCocina* NewHolder);
+
     /** Progreso [0..1] del procesado de ESTE ingrediente. Funciona en cualquier cliente. */
     UFUNCTION(BlueprintPure, Category = "Cocina")
     float GetProgresoProcesado01() const;

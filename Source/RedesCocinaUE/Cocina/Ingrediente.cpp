@@ -149,6 +149,25 @@ void AIngrediente::SetEnEstacionMC(const FVector& Loc, const FRotator& Rot, floa
     OnRep_EnEstacion();
 }
 
+void AIngrediente::EntregarAJugadorMC(APlayerCocina* NewHolder)
+{
+    UGameInstance* GI = GetGameInstance();
+    UFusionOnlineSubsystem* Fusion = GI ? GI->GetSubsystem<UFusionOnlineSubsystem>() : nullptr;
+    if (!Fusion || !Fusion->IsMasterClient()) return;
+    if (!NewHolder) return;
+
+    // Sale de la estacion y pasa a la mano del jugador. Como soy MC (owner), estos
+    // cambios replican a todos los clientes -> el ingrediente se engancha en la vista
+    // de todos, no solo en la del cliente que pulso E.
+    bEnEstacion = false;
+    ProcInicio = -1.0;
+    ProcDuracion = 0.f;
+    Holder = NewHolder;
+
+    OnRep_EnEstacion();
+    OnRep_Holder();
+}
+
 void AIngrediente::OnRep_EnEstacion()
 {
     if (!Mesh) return;
@@ -188,6 +207,15 @@ void AIngrediente::OnRep_Holder()
     if (Holder)
     {
         AttachToHolder();
+
+        // Si el ingrediente acaba de llegar a MI mano por replicacion (el MC me lo
+        // entrego desde una estacion) y todavia no soy su owner Fusion, reclamo
+        // ownership. Sin esto, mi posterior RequestDrop escribiria Holder=null sin
+        // replicar -> el MC seguiria viendolo en mi mano (mismo bug, al reves).
+        if (Holder->IsLocallyControlled() && !UFusionOnlineSubsystem::IsOwner(this))
+        {
+            UFusionOnlineSubsystem::SetWantsOwner(this, true);
+        }
     }
     else
     {
