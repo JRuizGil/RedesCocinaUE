@@ -5,7 +5,15 @@
       "mcp__claude_ai_Notion__notion-fetch",
       "Bash(rm \"Source/RedesCocinaUE/RedesCocinaUEGameMode.h\" \"Source/RedesCocinaUE/RedesCocinaUEGameMode.cpp\")",
       "PowerShell(& \"C:\\\\Program Files\\\\Epic Games\\\\UE_5.6\\\\Engine\\\\Build\\\\BatchFiles\\\\Build.bat\" RedesCocinaUEEditor Win64 Development -project=\"C:\\\\Users\\\\zanah\\\\Documents\\\\Unreal Projects\\\\RedesCocinaUE\\\\RedesCocinaUE.uproject\" -waitmutex 2>&1)",
-      "Bash(grep -iv \"//\")"
+      "Bash(grep -iv \"//\")",
+      "Bash(pandoc --version)",
+      "Bash(python -c \"import docx; print\\('python-docx OK'\\)\")",
+      "Bash(where python *)",
+      "Bash(where py *)",
+      "Bash(where pandoc *)",
+      "Bash(where soffice *)",
+      "Bash(py --version)",
+      "PowerShell(try { $w = New-Object -ComObject Word.Application; \"WORD_OK $\\($w.Version\\)\"; $w.Quit\\(\\) } catch { \"NO_WORD\" })"
     ],
     "additionalDirectories": [
       "C:\\Users\\JoseRamonRuizGil\\Documents\\Unreal Projects\\RedesCocinaUE\\Source\\RedesCocinaUE"
