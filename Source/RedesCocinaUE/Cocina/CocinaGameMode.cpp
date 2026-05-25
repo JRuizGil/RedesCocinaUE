@@ -18,9 +18,30 @@ AActor* ACocinaGameMode::ChoosePlayerStart_Implementation(AController* Player)
     for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It) Starts.Add(*It);
     if (Starts.Num() == 0) return Super::ChoosePlayerStart_Implementation(Player);
 
-    APlayerStart* Pick = Starts[NextStartIndex % Starts.Num()];
-    NextStartIndex++;
-    return Pick;
+    // TActorIterator no garantiza el mismo orden en cada maquina: ordena de forma
+    // determinista (por nombre) para que todos los clientes vean la misma lista.
+    Starts.Sort([](const APlayerStart& A, const APlayerStart& B)
+    {
+        return A.GetName() < B.GetName();
+    });
+
+    // En Fusion shared mode el GameMode corre en CADA cliente y cada uno spawnea su
+    // propio pawn. Un contador local (NextStartIndex) arranca en 0 en todos -> todos
+    // elegirian el mismo PlayerStart. Indexamos por el numero de jugador de Photon,
+    // que es unico y estable (master = 1, siguiente = 2, ...).
+    int32 Index = NextStartIndex++ % Starts.Num(); // fallback offline/PIE
+    if (UFusionOnlineSubsystem* Fusion = GetGameInstance()->GetSubsystem<UFusionOnlineSubsystem>())
+    {
+        const int32 PlayerNumber = Fusion->GetLocalPlayerId(); // 1, 2, 3, ...
+        if (PlayerNumber > 0)
+        {
+            Index = (PlayerNumber - 1) % Starts.Num();
+        }
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[CocinaGameMode] ChoosePlayerStart -> %s (index %d de %d)"),
+           *GetNameSafe(Starts[Index]), Index, Starts.Num());
+    return Starts[Index];
 }
 
 void ACocinaGameMode::PostLogin(APlayerController* NewPlayer)
